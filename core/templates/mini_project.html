@@ -605,10 +605,34 @@
         <div id="sdg" class="tab-content">
             <div class="info-card">
                 <h5><i class="bi bi-globe"></i> Sustainable Development Goals (SDG)</h5>
-                <p style="color: #9ca3af; margin-bottom: 20px;">Submit your project's SDG alignment and work packages.</p>
-                <a class="btn btn-primary" href="/sdg-submission/">
-                    <i class="bi bi-arrow-right"></i> Go to SDG Submission
-                </a>
+                
+                {% if selected_sdgs %}
+                    <p style="color: #9ca3af; margin-bottom: 20px;"><strong>Selected SDG Goals:</strong></p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        {% for sdg in selected_sdgs %}
+                        <div style="background: rgba(249, 115, 22, 0.1); border: 1px solid rgba(249, 115, 22, 0.3); border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                            <div style="background: linear-gradient(135deg, rgba(249, 115, 22, 0.8) 0%, rgba(217, 119, 6, 0.8) 100%); color: white; width: 45px; height: 45px; min-width: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem;">
+                                {{ sdg.number }}
+                            </div>
+                            <div>
+                                <p style="color: #fdba74; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem;">SDG #{{ sdg.number }}</p>
+                                <p style="color: #e5e7eb; margin: 0; font-size: 0.85rem;">{{ sdg.name }}</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    {% if is_leader %}
+                    <a class="btn btn-outline-secondary btn-sm" href="{% url 'sdg_submission' %}">
+                        <i class="bi bi-pencil"></i> Edit SDG Selection
+                    </a>
+                    {% endif %}
+                {% else %}
+                    <p style="color: #9ca3af; margin-bottom: 20px;">Submit your project's SDG alignment and work packages.</p>
+                    <a class="btn btn-primary" href="{% url 'sdg_submission' %}">
+                        <i class="bi bi-arrow-right"></i> Go to SDG Submission
+                    </a>
+                {% endif %}
             </div>
         </div>
 
