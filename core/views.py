@@ -70,7 +70,25 @@ def dashboard(request):
 	elif _is_coordinator(request.user):
 		request.session["active_role"] = "coordinator"
 		return redirect("coordinator_dashboard")
-	return render(request, "dashboard.html")
+	
+	# Get student-specific data for dashboard
+	group = _get_group_for_user(request.user)
+	group_size = _get_group_size(group) if group else 0
+	group_ready = group_size >= 4
+	
+	# Get pending requests count
+	pending_requests_count = GroupRequest.objects.filter(
+		recipient=request.user,
+		status=GroupRequest.STATUS_PENDING
+	).count()
+	
+	context = {
+		'group': group,
+		'group_size': group_size,
+		'group_ready': group_ready,
+		'pending_requests_count': pending_requests_count,
+	}
+	return render(request, "dashboard.html", context)
 
 
 @login_required
