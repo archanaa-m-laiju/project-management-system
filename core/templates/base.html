@@ -156,7 +156,6 @@
             <a class="navbar-brand fw-semibold" href="/">Project Evaluation System</a>
             <div class="d-flex align-items-center gap-3">
                 {% if user.is_authenticated %}
-                    {% include 'notification_dropdown.html' %}
                     <a href="{% url 'profile' %}" class="btn btn-light btn-sm">Profile</a>
                     <span class="navbar-text">{{ user.username }}</span>
 >>>>>>> 6257406cfeef8d19d9faeb763a634ff639bd471c
