@@ -426,6 +426,7 @@
             <li><a href="#guide" class="tab-link"><i class="bi bi-person-badge"></i> Guide</a></li>
             <li><a href="#sdg" class="tab-link"><i class="bi bi-globe"></i> SDG</a></li>
             <li><a href="#abstract" class="tab-link"><i class="bi bi-file-text"></i> Abstract</a></li>
+            <li><a href="#evaluation" class="tab-link"><i class="bi bi-clipboard-check"></i> Evaluation</a></li>
         </ul>
     </div>
 
@@ -680,6 +681,321 @@
                     </a>
                 </div>
             </div>
+        </div>
+
+        <!-- Evaluation Tab -->
+        <div id="evaluation" class="tab-content">
+            {% if group %}
+            <div class="info-card">
+                <h5 style="color: #fbbf24; margin-bottom: 1rem;"><i class="bi bi-clipboard-check"></i> Zeroth Evaluation</h5>
+                
+                {% with file=evaluation_files.zeroth %}
+                {% if file %}
+                    <div class="alert alert-success mb-3" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3);">
+                        <strong>✅ File Uploaded:</strong> {{ file.file_name }}
+                        <span class="text-muted">({{ file.file_size|filesizeformat }})</span><br>
+                        <small class="text-muted">Uploaded on: {{ file.uploaded_at|date:"M d, Y H:i" }}</small><br>
+                        <a href="{% url 'download_evaluation_file' file.id %}" class="btn btn-success btn-sm mt-2">Download File</a>
+                    </div>
+                    <p class="text-muted small">Your guide and coordinator can now evaluate your submission.</p>
+                {% else %}
+                    <div class="alert alert-warning mb-3" style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3);">
+                        <strong>⚠️ No file uploaded yet</strong><br>
+                        Upload your evaluation file (PDF, PPT, DOC, DOCX) for review.
+                    </div>
+                    
+                    {% if group.leader == request.user %}
+                    <form method="post" action="{% url 'upload_evaluation_file' 'zeroth' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="fileInput" class="form-label" style="color: #e5e7eb;">Select File</label>
+                            <input type="file" class="form-control" id="fileInput" name="file" accept=".pdf,.ppt,.pptx,.doc,.docx" required>
+                            <div class="form-text" style="color: #9ca3af;">Allowed formats: PDF, PPT, PPTX, DOC, DOCX (Max: 10MB)</div>
+                        </div>
+                        <button type="submit" class="btn btn-warning">Upload File</button>
+                    </form>
+                    {% else %}
+                    <p class="text-muted small">Only the group leader can upload files.</p>
+                    {% endif %}
+                {% endif %}
+                {% endwith %}
+                
+                <!-- Show Evaluation Results if Completed -->
+                {% with eval=evaluations.zeroth %}
+                {% if eval and eval.is_completed %}
+                <div class="mt-4 pt-3" style="border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <h6 style="color: #86efac; margin-bottom: 1rem;">✅ Evaluation Completed</h6>
+                    
+                    {% if eval.guide_review %}
+                    <div class="mb-3" style="background: rgba(139, 92, 246, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid rgba(139, 92, 246, 0.3);">
+                        <strong style="color: #a78bfa; font-size: 0.9rem;">📝 Guide's Review:</strong>
+                        <p style="color: #e5e7eb; margin: 0.5rem 0 0; font-size: 0.9rem;">{{ eval.guide_review }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if eval.coordinator_review %}
+                    <div class="mb-3" style="background: rgba(99, 102, 241, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.3);">
+                        <strong style="color: #a5b4fc; font-size: 0.9rem;">📝 Coordinator's Review:</strong>
+                        <p style="color: #e5e7eb; margin: 0.5rem 0 0; font-size: 0.9rem;">{{ eval.coordinator_review }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if not eval.guide_review and not eval.coordinator_review %}
+                    <p class="text-muted small" style="margin: 0;">Both evaluations completed. No written reviews provided.</p>
+                    {% endif %}
+                </div>
+                {% elif eval %}
+                <div class="mt-3">
+                    <p class="text-muted small" style="margin: 0;">
+                        ⏳ Evaluation in progress
+                        {% if eval.guide_submitted %}(Guide: ✓){% else %}(Guide: ⏸){% endif %}
+                        {% if eval.coordinator_submitted %}(Coordinator: ✓){% else %}(Coordinator: ⏸){% endif %}
+                    </p>
+                </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- First Evaluation (Unlocked after Zeroth) -->
+            <div class="info-card mt-4" style="{% if not first_unlocked %}opacity: 0.4; pointer-events: none;{% endif %}">
+                <h5 style="color: #60a5fa; margin-bottom: 1rem;"><i class="bi bi-clipboard-check"></i> First Evaluation {% if not first_unlocked %}🔒{% endif %}</h5>
+                
+                {% if not first_unlocked %}
+                    <div class="alert alert-info mb-3" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3);">
+                        <strong>🔒 Locked</strong><br>
+                        Complete Zeroth Evaluation first to unlock First Evaluation.
+                    </div>
+                {% else %}
+                    {% with eval=student_evaluations.first %}
+                    {% if eval and eval.finalized %}
+                    <div class="alert alert-success mb-3" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3);">
+                        <strong>✅ Evaluation Completed</strong>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <h6 style="color: #86efac; margin-bottom: 1rem;">Your Marks (Out of 40)</h6>
+                        
+                        <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(71, 85, 105, 0.3); border-radius: 8px; overflow: hidden;">
+                            <table style="width: 100%; color: #e5e7eb; font-size: 0.9rem;">
+                                <thead style="background: rgba(30, 41, 59, 0.7);">
+                                    <tr>
+                                        <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid rgba(71, 85, 105, 0.3);">Criteria</th>
+                                        <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.3);">Max</th>
+                                        <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.3);">Guide</th>
+                                        <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.3);">Coordinator</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Topic identification / literature survey</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_topic|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_topic|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Project planning / scheduling / resources</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_planning|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_planning|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Scalability and reliability</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">2</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_scalability|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_scalability|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Novelty of idea and implementation</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_novelty|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_novelty|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Task distribution among team</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_task_distribution|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_task_distribution|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Adherence to project schedule</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">3</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_schedule|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_schedule|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Interim results</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_interim|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_interim|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Presentation</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_presentation|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_presentation|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Viva</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_viva|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_viva|default:"—" }}</td>
+                                    </tr>
+                                    <tr style="font-weight: 600; background: rgba(30, 41, 59, 0.5);">
+                                        <td style="padding: 0.75rem;">TOTAL</td>
+                                        <td style="padding: 0.75rem; text-align: center;">40</td>
+                                        <td style="padding: 0.75rem; text-align: center; color: #fbbf24;">{{ eval.guide_total }}</td>
+                                        <td style="padding: 0.75rem; text-align: center; color: #fbbf24;">{{ eval.coordinator_total }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-3" style="text-align: center;">
+                            <p style="font-size: 1.2rem; color: #86efac; font-weight: 600;">
+                                Average: {{ eval.average_total|floatformat:2 }} / 40
+                            </p>
+                        </div>
+                    </div>
+                    {% elif eval %}
+                    <div class="mt-3">
+                        <p class="text-muted small" style="margin: 0;">
+                            ⏳ Evaluation in progress
+                            {% if eval.guide_submitted %}(Guide: ✓){% else %}(Guide: ⏸){% endif %}
+                            {% if eval.coordinator_submitted %}(Coordinator: ✓){% else %}(Coordinator: ⏸){% endif %}
+                        </p>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info mb-3" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3);">
+                        <strong>⏳ Awaiting Evaluation</strong><br>
+                        Your guide and coordinator will evaluate you soon.
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                {% endif %}
+            </div>
+
+            <!-- Second Evaluation (Unlocked after First) -->
+            <div class="info-card mt-4" style="{% if not second_unlocked %}opacity: 0.4; pointer-events: none;{% endif %}">
+                <h5 style="color: #a78bfa; margin-bottom: 1rem;"><i class="bi bi-clipboard-check"></i> Second Evaluation {% if not second_unlocked %}🔒{% endif %}</h5>
+                
+                {% if not second_unlocked %}
+                    <div class="alert alert-info mb-3" style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3);">
+                        <strong>🔒 Locked</strong><br>
+                        Complete First Evaluation first to unlock Second Evaluation.
+                    </div>
+                {% else %}
+                    {% with eval=student_evaluations.second %}
+                    {% if eval and eval.finalized %}
+                    <div class="alert alert-success mb-3" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3);">
+                        <strong>✅ Evaluation Completed</strong>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <h6 style="color: #86efac; margin-bottom: 1rem;">Your Marks (Out of 40)</h6>
+                        
+                        <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(71, 85, 105, 0.3); border-radius: 8px; overflow: hidden;">
+                            <table style="width: 100%; color: #e5e7eb; font-size: 0.9rem;">
+                                <thead style="background: rgba(30, 41, 59, 0.7);">
+                                    <tr>
+                                        <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid rgba(71, 85, 105, 0.3);">Criteria</th>
+                                        <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.3);">Max</th>
+                                        <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.3);">Guide</th>
+                                        <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.3);">Coordinator</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Topic identification / literature survey</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_topic|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_topic|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Project planning / scheduling / resources</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_planning|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_planning|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Scalability and reliability</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">2</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_scalability|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_scalability|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Novelty of idea and implementation</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_novelty|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_novelty|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Task distribution among team</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_task_distribution|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_task_distribution|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Adherence to project schedule</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">3</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_schedule|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_schedule|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Interim results</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_interim|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_interim|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Presentation</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_presentation|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_presentation|default:"—" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 0.5rem; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">Viva</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">5</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.guide_viva|default:"—" }}</td>
+                                        <td style="padding: 0.5rem; text-align: center; border-bottom: 1px solid rgba(71, 85, 105, 0.2);">{{ eval.coordinator_viva|default:"—" }}</td>
+                                    </tr>
+                                    <tr style="font-weight: 600; background: rgba(30, 41, 59, 0.5);">
+                                        <td style="padding: 0.75rem;">TOTAL</td>
+                                        <td style="padding: 0.75rem; text-align: center;">40</td>
+                                        <td style="padding: 0.75rem; text-align: center; color: #fbbf24;">{{ eval.guide_total }}</td>
+                                        <td style="padding: 0.75rem; text-align: center; color: #fbbf24;">{{ eval.coordinator_total }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-3" style="text-align: center;">
+                            <p style="font-size: 1.2rem; color: #86efac; font-weight: 600;">
+                                Average: {{ eval.average_total|floatformat:2 }} / 40
+                            </p>
+                        </div>
+                    </div>
+                    {% elif eval %}
+                    <div class="mt-3">
+                        <p class="text-muted small" style="margin: 0;">
+                            ⏳ Evaluation in progress
+                            {% if eval.guide_submitted %}(Guide: ✓){% else %}(Guide: ⏸){% endif %}
+                            {% if eval.coordinator_submitted %}(Coordinator: ✓){% else %}(Coordinator: ⏸){% endif %}
+                        </p>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info mb-3" style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3);">
+                        <strong>⏳ Awaiting Evaluation</strong><br>
+                        Your guide and coordinator will evaluate you soon.
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="info-card">
+                <p style="color: #9ca3af;">You must be in a group to access evaluation features.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

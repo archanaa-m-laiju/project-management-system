@@ -26,4 +26,12 @@ urlpatterns = [
     path("download-abstract/<int:abstract_id>/", views.download_abstract, name="download_abstract"),
     # HOD URLs
     path("hod-dashboard/", views.hod_dashboard, name="hod_dashboard"),
+    # Evaluation URLs
+    path("evaluation/guide/<int:group_id>/<str:stage>/", views.submit_guide_evaluation, name="submit_guide_evaluation"),
+    path("evaluation/coordinator/<int:group_id>/<str:stage>/", views.submit_coordinator_evaluation, name="submit_coordinator_evaluation"),
+    path("evaluation/upload/<str:stage>/", views.upload_evaluation_file, name="upload_evaluation_file"),
+    path("evaluation/download/<int:file_id>/", views.download_evaluation_file, name="download_evaluation_file"),
+    # Student Evaluation URLs (First/Second)
+    path("student-evaluation/guide/<int:group_id>/<str:stage>/", views.submit_guide_student_evaluation, name="submit_guide_student_evaluation"),
+    path("student-evaluation/coordinator/<int:group_id>/<str:stage>/", views.submit_coordinator_student_evaluation, name="submit_coordinator_student_evaluation"),
 ]
