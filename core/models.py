@@ -1,12 +1,37 @@
 from django.contrib.auth.models import User
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 
+class Class(models.Model):
+	"""Represents a class/section. Each class has two coordinators assigned."""
+	name = models.CharField(max_length=100, unique=True)
+	department = models.CharField(max_length=100)
+	
+	class Meta:
+		verbose_name_plural = "Classes"
+	
+	def __str__(self):
+		return f"{self.name} - {self.department}"
+
+
+class CoordinatorAssignment(models.Model):
+	"""Assigns coordinators to classes. Each class should have exactly 2 coordinators."""
+	faculty = models.ForeignKey(User, on_delete=models.CASCADE, related_name="coordinator_assignments")
+	student_class = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="coordinator_assignments")
+	
+	class Meta:
+		unique_together = ("faculty", "student_class")
+	
+	def __str__(self):
+		return f"{self.faculty.username} → {self.student_class.name}"
+
+
 class StudentProfile(models.Model):
 	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="student_profile")
-	class_name = models.CharField(max_length=100, blank=True, null=True)
+	student_class = models.ForeignKey(Class, on_delete=models.SET_NULL, null=True, blank=True, related_name="students")
 	roll_number = models.CharField(max_length=50, blank=True, null=True)
 	register_number = models.CharField(max_length=50, blank=True, null=True)
 	department = models.CharField(max_length=100, blank=True, null=True)
@@ -93,11 +118,17 @@ class CoordinatorApproval(models.Model):
 		(STATUS_REJECTED, "Rejected"),
 	]
 
-	group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="coordinator_approval")
+	group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="coordinator_approvals")
 	coordinator = models.ForeignKey(User, on_delete=models.CASCADE, related_name="coordinator_approvals")
 	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
+	
+	class Meta:
+		unique_together = ("group", "coordinator")
+	
+	def __str__(self):
+		return f"Group {self.group.id} - {self.coordinator.username} ({self.status})"
 
 
 class Abstract(models.Model):
@@ -118,7 +149,9 @@ class Abstract(models.Model):
 	pdf_size = models.IntegerField(null=True, blank=True)
 	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
 	guide_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
-	coordinator_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+	coordinator_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)  # Keep for backward compatibility
+	coordinator1_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+	coordinator2_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
 	hod_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
 	is_final_approved = models.BooleanField(default=False)
 	presentation_approved = models.BooleanField(default=False)
@@ -211,4 +244,387 @@ class Notification(models.Model):
 
 	def __str__(self):
 		return f"Notification for {self.recipient.username}: {self.message[:50]}"
+
+
+class GroupEvaluation(models.Model):
+	STAGE_CHOICES = [
+		("zeroth", "Zeroth Evaluation"),
+		("first", "First Evaluation"),
+		("second", "Second Evaluation"),
+		("final", "Final Evaluation"),
+	]
+
+	group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="evaluations")
+	stage = models.CharField(max_length=10, choices=STAGE_CHOICES)
+
+	# Guide evaluation checkboxes
+	guide_technical_exposure = models.BooleanField(default=False)
+	guide_socially_relevant = models.BooleanField(default=False)
+	guide_product_based = models.BooleanField(default=False)
+	guide_research_oriented = models.BooleanField(default=False)
+
+	# Coordinator 1 evaluation checkboxes
+	coordinator1_technical_exposure = models.BooleanField(default=False)
+	coordinator1_socially_relevant = models.BooleanField(default=False)
+	coordinator1_product_based = models.BooleanField(default=False)
+	coordinator1_research_oriented = models.BooleanField(default=False)
+	
+	# Coordinator 2 evaluation checkboxes
+	coordinator2_technical_exposure = models.BooleanField(default=False)
+	coordinator2_socially_relevant = models.BooleanField(default=False)
+	coordinator2_product_based = models.BooleanField(default=False)
+	coordinator2_research_oriented = models.BooleanField(default=False)
+
+	# Legacy coordinator evaluation checkboxes (keep for backward compatibility)
+	coordinator_technical_exposure = models.BooleanField(default=False)
+	coordinator_socially_relevant = models.BooleanField(default=False)
+	coordinator_product_based = models.BooleanField(default=False)
+	coordinator_research_oriented = models.BooleanField(default=False)
+
+	# Review/Feedback fields
+	guide_review = models.TextField(blank=True, null=True)
+	coordinator1_review = models.TextField(blank=True, null=True)
+	coordinator2_review = models.TextField(blank=True, null=True)
+	coordinator_review = models.TextField(blank=True, null=True)  # Keep for backward compatibility
+
+	guide_submitted = models.BooleanField(default=False)
+	coordinator1_submitted = models.BooleanField(default=False)
+	coordinator2_submitted = models.BooleanField(default=False)
+	coordinator_submitted = models.BooleanField(default=False)  # Keep for backward compatibility
+
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		unique_together = ("group", "stage")
+		ordering = ["group", "stage"]
+
+	def __str__(self):
+		return f"{self.group.leader.username} - {self.get_stage_display()}"
+
+	@property
+	def zeroth_completed(self):
+		"""Zeroth stage is complete when guide and any one coordinator have submitted."""
+		return self.guide_submitted and (
+			self.coordinator1_submitted or self.coordinator2_submitted or self.coordinator_submitted
+		)
+
+	@property
+	def is_completed(self):
+		"""Stage-aware completion: zeroth allows any one coordinator; later stages require both."""
+		if self.stage == "zeroth":
+			return self.zeroth_completed
+		return self.guide_submitted and self.coordinator1_submitted and self.coordinator2_submitted
+
+
+class EvaluationFile(models.Model):
+	"""File uploads for group evaluations (PDF, PPT, etc.)"""
+	STAGE_CHOICES = [
+		("zeroth", "Zeroth Evaluation"),
+		("first", "First Evaluation"),
+		("second", "Second Evaluation"),
+		("final", "Final Evaluation"),
+	]
+
+	group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="evaluation_files")
+	stage = models.CharField(max_length=10, choices=STAGE_CHOICES)
+	file_data = models.BinaryField()
+	file_name = models.CharField(max_length=255)
+	file_size = models.IntegerField()
+	file_type = models.CharField(max_length=100)  # e.g., 'application/pdf', 'application/vnd.ms-powerpoint'
+	uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="uploaded_evaluation_files")
+	uploaded_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ["-uploaded_at"]
+
+	def __str__(self):
+		return f"{self.group.leader.username} - {self.get_stage_display()} - {self.file_name}"
+
+	@property
+	def file_extension(self):
+		"""Returns the file extension."""
+		return self.file_name.split('.')[-1].lower() if '.' in self.file_name else ''
+
+
+class ProjectReport(models.Model):
+	"""Group-level project report and coordinator review marks."""
+	STATUS_PENDING = "pending"
+	STATUS_APPROVED = "approved"
+	STATUS_REJECTED = "rejected"
+	STATUS_CHOICES = [
+		(STATUS_PENDING, "Pending"),
+		(STATUS_APPROVED, "Approved"),
+		(STATUS_REJECTED, "Rejected"),
+	]
+
+	group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="project_report")
+	report_file = models.FileField(upload_to="project_reports/")
+	uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
+	uploaded_at = models.DateTimeField(auto_now_add=True)
+	review_status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_PENDING)
+	rejection_review = models.TextField(blank=True)
+	rejected_by = models.ForeignKey(
+		User,
+		null=True,
+		blank=True,
+		on_delete=models.SET_NULL,
+		related_name="rejected_project_reports",
+	)
+	rejected_at = models.DateTimeField(null=True, blank=True)
+
+	coordinator1_mark = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(10)],
+	)
+	coordinator2_mark = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(10)],
+	)
+	final_mark = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(10)],
+	)
+
+	coordinator1_submitted = models.BooleanField(default=False)
+	coordinator2_submitted = models.BooleanField(default=False)
+
+	def __str__(self):
+		return f"Project Report - Group {self.group_id}"
+
+
+class StudentEvaluation(models.Model):
+	"""Per-student evaluation for First and Second stages with detailed criteria."""
+	STAGE_CHOICES = [
+		("first", "First Evaluation"),
+		("second", "Second Evaluation"),
+	]
+
+	student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="student_evaluations")
+	group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="student_evaluations")
+	stage = models.CharField(max_length=10, choices=STAGE_CHOICES)
+
+	# Guide marks (max 40 total)
+	guide_topic = models.IntegerField(null=True, blank=True)  # max 5
+	guide_planning = models.IntegerField(null=True, blank=True)  # max 5
+	guide_scalability = models.IntegerField(null=True, blank=True)  # max 2
+	guide_novelty = models.IntegerField(null=True, blank=True)  # max 5
+	guide_task_distribution = models.IntegerField(null=True, blank=True)  # max 5
+	guide_schedule = models.IntegerField(null=True, blank=True)  # max 3
+	guide_interim = models.IntegerField(null=True, blank=True)  # max 5
+	guide_presentation = models.IntegerField(null=True, blank=True)  # max 5
+	guide_viva = models.IntegerField(null=True, blank=True)  # max 5
+
+	guide_submitted = models.BooleanField(default=False)
+
+	# Coordinator 1 marks (max 40 total)
+	coordinator1_topic = models.IntegerField(null=True, blank=True)
+	coordinator1_planning = models.IntegerField(null=True, blank=True)
+	coordinator1_scalability = models.IntegerField(null=True, blank=True)
+	coordinator1_novelty = models.IntegerField(null=True, blank=True)
+	coordinator1_task_distribution = models.IntegerField(null=True, blank=True)
+	coordinator1_schedule = models.IntegerField(null=True, blank=True)
+	coordinator1_interim = models.IntegerField(null=True, blank=True)
+	coordinator1_presentation = models.IntegerField(null=True, blank=True)
+	coordinator1_viva = models.IntegerField(null=True, blank=True)
+
+	coordinator1_submitted = models.BooleanField(default=False)
+
+	# Coordinator 2 marks (max 40 total)
+	coordinator2_topic = models.IntegerField(null=True, blank=True)
+	coordinator2_planning = models.IntegerField(null=True, blank=True)
+	coordinator2_scalability = models.IntegerField(null=True, blank=True)
+	coordinator2_novelty = models.IntegerField(null=True, blank=True)
+	coordinator2_task_distribution = models.IntegerField(null=True, blank=True)
+	coordinator2_schedule = models.IntegerField(null=True, blank=True)
+	coordinator2_interim = models.IntegerField(null=True, blank=True)
+	coordinator2_presentation = models.IntegerField(null=True, blank=True)
+	coordinator2_viva = models.IntegerField(null=True, blank=True)
+
+	coordinator2_submitted = models.BooleanField(default=False)
+
+	# Legacy coordinator marks (keep for backward compatibility)
+	coordinator_topic = models.IntegerField(null=True, blank=True)
+	coordinator_planning = models.IntegerField(null=True, blank=True)
+	coordinator_scalability = models.IntegerField(null=True, blank=True)
+	coordinator_novelty = models.IntegerField(null=True, blank=True)
+	coordinator_task_distribution = models.IntegerField(null=True, blank=True)
+	coordinator_schedule = models.IntegerField(null=True, blank=True)
+	coordinator_interim = models.IntegerField(null=True, blank=True)
+	coordinator_presentation = models.IntegerField(null=True, blank=True)
+	coordinator_viva = models.IntegerField(null=True, blank=True)
+
+	coordinator_submitted = models.BooleanField(default=False)
+
+	attendance_marks = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(10)],
+	)
+	attendance_submitted = models.BooleanField(default=False)
+	attendance_submitted_by = models.ForeignKey(
+		User,
+		null=True,
+		blank=True,
+		on_delete=models.SET_NULL,
+		related_name="attendance_uploaded",
+	)
+	attendance_submitted_at = models.DateTimeField(null=True, blank=True)
+
+	final_guide_topic = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_planning = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_scale = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(2)],
+	)
+	final_guide_novelty = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_task = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_schedule = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(3)],
+	)
+	final_guide_interim = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_presentation = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_viva = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_total = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(40)],
+	)
+
+	final_guide_raw = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(40)],
+	)
+	final_guide_mark = models.IntegerField(null=True, blank=True)
+	final_guide_submitted = models.BooleanField(default=False)
+	final_guide_submitted_at = models.DateTimeField(null=True, blank=True)
+
+	# CIE (Continuous Internal Evaluation) fields — stored on the "second" stage record
+	committee_raw_total = models.IntegerField(null=True, blank=True)
+	committee_mark = models.IntegerField(null=True, blank=True)
+	cie_total = models.IntegerField(null=True, blank=True)
+	cie_calculated = models.BooleanField(default=False)
+	cie_calculated_at = models.DateTimeField(null=True, blank=True)
+
+	finalized = models.BooleanField(default=False)
+
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		unique_together = ("student", "stage")
+		ordering = ["group", "stage", "student"]
+
+	def __str__(self):
+		return f"{self.student.username} - {self.get_stage_display()}"
+
+	@property
+	def guide_total(self):
+		"""Calculate total guide marks."""
+		marks = [
+			self.guide_topic or 0,
+			self.guide_planning or 0,
+			self.guide_scalability or 0,
+			self.guide_novelty or 0,
+			self.guide_task_distribution or 0,
+			self.guide_schedule or 0,
+			self.guide_interim or 0,
+			self.guide_presentation or 0,
+			self.guide_viva or 0,
+		]
+		return sum(marks)
+
+	@property
+	def coordinator1_total(self):
+		"""Calculate total coordinator1 marks."""
+		marks = [
+			self.coordinator1_topic or 0,
+			self.coordinator1_planning or 0,
+			self.coordinator1_scalability or 0,
+			self.coordinator1_novelty or 0,
+			self.coordinator1_task_distribution or 0,
+			self.coordinator1_schedule or 0,
+			self.coordinator1_interim or 0,
+			self.coordinator1_presentation or 0,
+			self.coordinator1_viva or 0,
+		]
+		return sum(marks)
+	
+	@property
+	def coordinator2_total(self):
+		"""Calculate total coordinator2 marks."""
+		marks = [
+			self.coordinator2_topic or 0,
+			self.coordinator2_planning or 0,
+			self.coordinator2_scalability or 0,
+			self.coordinator2_novelty or 0,
+			self.coordinator2_task_distribution or 0,
+			self.coordinator2_schedule or 0,
+			self.coordinator2_interim or 0,
+			self.coordinator2_presentation or 0,
+			self.coordinator2_viva or 0,
+		]
+		return sum(marks)
+
+	@property
+	def coordinator_total(self):
+		"""Calculate total coordinator marks (legacy compatibility)."""
+		marks = [
+			self.coordinator_topic or 0,
+			self.coordinator_planning or 0,
+			self.coordinator_scalability or 0,
+			self.coordinator_novelty or 0,
+			self.coordinator_task_distribution or 0,
+			self.coordinator_schedule or 0,
+			self.coordinator_interim or 0,
+			self.coordinator_presentation or 0,
+			self.coordinator_viva or 0,
+		]
+		return sum(marks)
+
+	@property
+	def second_eval_completed(self):
+		"""Returns True when guide and both coordinators have submitted second evaluation marks."""
+		return self.guide_submitted and self.coordinator1_submitted and self.coordinator2_submitted
+
+	@property
+	def is_completed(self):
+		"""Returns True if guide and both coordinators have submitted and finalized."""
+		return self.second_eval_completed and self.finalized
+
 

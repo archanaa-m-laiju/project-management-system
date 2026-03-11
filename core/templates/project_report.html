@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .navbar { display: none !important; }
+    .container { max-width: 980px; margin-top: 30px; }
+    .report-card {
+        background: rgba(15, 23, 42, 0.92);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 14px;
+        padding: 24px;
+        color: #e5e7eb;
+        margin-bottom: 18px;
+    }
+    .report-title { color: #fdba74; margin-bottom: 12px; }
+    .muted { color: #9ca3af; }
+</style>
+
+<div class="report-card">
+    <h3 class="report-title">Project Report</h3>
+    <p class="muted" style="margin-bottom: 0;">Group {{ group.id }} | Leader: {{ group.leader.username }}</p>
+</div>
+
+{% if not can_submit_report %}
+<div class="report-card" style="border-color: rgba(251, 191, 36, 0.35);">
+    <div class="alert alert-warning mb-0" style="background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.35); color: #fbbf24;">
+        Project report can only be submitted after completion of First and Second Evaluations.
+    </div>
+</div>
+{% endif %}
+
+{% if project_report %}
+<div class="report-card">
+    <h5 style="color: #86efac;">Uploaded Report</h5>
+    <p style="margin-bottom: 10px;"><strong>File:</strong> {{ project_report.report_file.name|cut:'project_reports/' }}</p>
+    <a class="btn btn-success btn-sm" href="{% url 'download_project_report' project_report.id %}">Download Report</a>
+</div>
+{% endif %}
+
+{% if is_leader and can_submit_report %}
+<div class="report-card">
+    <h5 style="color: #93c5fd;">{% if project_report %}Replace{% else %}Upload{% endif %} Project Report (PDF)</h5>
+    <form method="post" action="{% url 'submit_project_report' group.id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+            <input type="file" class="form-control" name="report_file" accept="application/pdf,.pdf" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">{% if project_report %}Update Report{% else %}Upload Report{% endif %}</button>
+        <a href="{% url 'mini_project' %}" class="btn btn-outline-secondary btn-sm ms-2">Back</a>
+    </form>
+</div>
+{% elif not is_leader %}
+<div class="report-card">
+    <p class="muted mb-0">Only the group leader can upload the project report.</p>
+</div>
+{% endif %}
+{% endblock %}
