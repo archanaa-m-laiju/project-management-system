@@ -2,8 +2,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Prefetch, Q
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from .models import Abstract, CoordinatorApproval, Group, GroupMember, GroupRequest, GuideRequest, Notification, StudentProfile, FacultyProfile, SustainableDevelopmentGoal, GroupEvaluation, EvaluationFile, StudentEvaluation
@@ -114,6 +115,19 @@ def dashboard(request):
 		'evaluations': evaluations,
 	}
 	return render(request, "dashboard.html", context)
+
+
+@login_required
+def switch_role(request):
+	if not _has_dual_faculty_roles(request.user):
+		return redirect("dashboard")
+	active_role = _get_active_faculty_role(request)
+	if active_role == "guide":
+		request.session["active_role"] = "coordinator"
+		return redirect("coordinator_dashboard")
+	else:
+		request.session["active_role"] = "guide"
+		return redirect("guide_dashboard")
 
 
 @login_required
@@ -607,8 +621,25 @@ def guide_dashboard(request):
 		for guide_request in accepted_requests
 	]
 
+	# Get pending guide requests for the requests tab
+	pending_requests = GuideRequest.objects.filter(
+		guide=request.user,
+		status=GuideRequest.STATUS_PENDING
+	).select_related("group", "group__leader", "group__leader__student_profile")
+
+	# Get abstracts for the review abstracts tab
+	all_abstracts = Abstract.objects.filter(group_id__in=group_ids).select_related("group", "group__leader").order_by("-submitted_at")
+	pending_abstracts = all_abstracts.filter(guide_status=Abstract.STATUS_PENDING)
+	approved_abstracts = all_abstracts.filter(guide_status=Abstract.STATUS_APPROVED)
+	rejected_abstracts = all_abstracts.filter(guide_status=Abstract.STATUS_REJECTED)
+
 	context = {
 		"assigned_groups": assigned_groups,
+		"pending_requests": pending_requests,
+		"pending_abstracts": pending_abstracts,
+		"approved_abstracts": approved_abstracts,
+		"rejected_abstracts": rejected_abstracts,
+		"is_dual_role": _has_dual_faculty_roles(request.user),
 	}
 	return render(request, "guide_dashboard.html", context)
 
@@ -636,7 +667,7 @@ def guide_requests(request):
 			guide_request_obj.status = GuideRequest.STATUS_REJECTED
 			guide_request_obj.save()
 			messages.info(request, "Request rejected.")
-		return redirect("guide_requests")
+		return HttpResponseRedirect(reverse("guide_dashboard") + "#requests")
 
 	pending_requests = GuideRequest.objects.filter(guide=request.user, status=GuideRequest.STATUS_PENDING).select_related("group", "group__leader", "group__leader__student_profile")
 	context = {"pending_requests": pending_requests}
@@ -962,11 +993,11 @@ def coordinator_dashboard(request):
 			abstract_class = getattr(getattr(abstract.group.leader, "student_profile", None), "class_name", None)
 			if abstract_class not in assigned_classes_for_post:
 				messages.error(request, "You are not authorized to review this abstract.")
-				return redirect("coordinator_dashboard")
+				return HttpResponseRedirect(reverse("coordinator_dashboard") + "#topics")
 
 			if abstract.guide_status != Abstract.STATUS_APPROVED or abstract.coordinator_status != Abstract.STATUS_PENDING:
 				messages.error(request, "This abstract is not available for coordinator review.")
-				return redirect("coordinator_dashboard")
+				return HttpResponseRedirect(reverse("coordinator_dashboard") + "#topics")
 
 			if abstract_action == "approve":
 				abstract.coordinator_status = Abstract.STATUS_APPROVED
@@ -997,13 +1028,13 @@ def coordinator_dashboard(request):
 				messages.info(request, "Abstract rejected by coordinator.")
 			else:
 				messages.error(request, "Invalid abstract review action.")
-			return redirect("coordinator_dashboard")
+			return HttpResponseRedirect(reverse("coordinator_dashboard") + "#topics")
 
 		approval_id = request.POST.get("approval_id")
 		action = request.POST.get("action")
 		if not approval_id:
 			messages.error(request, "Invalid coordinator action.")
-			return redirect("coordinator_dashboard")
+			return HttpResponseRedirect(reverse("coordinator_dashboard") + "#approvals")
 		approval = get_object_or_404(CoordinatorApproval, id=approval_id, coordinator=request.user)
 
 		if action == "approve":
@@ -1014,7 +1045,7 @@ def coordinator_dashboard(request):
 			approval.status = CoordinatorApproval.STATUS_REJECTED
 			approval.save()
 			messages.info(request, "Group rejected.")
-		return redirect("coordinator_dashboard")
+		return HttpResponseRedirect(reverse("coordinator_dashboard") + "#approvals")
 
 	faculty_profile = request.user.faculty_profile
 	coordinator_dept = faculty_profile.department
@@ -1143,6 +1174,7 @@ def coordinator_dashboard(request):
 		"assigned_classes": assigned_classes,
 		"group_details": group_details,
 		"coordinator_pending_abstracts": coordinator_pending_abstracts,
+		"is_dual_role": _has_dual_faculty_roles(request.user),
 	}
 	return render(request, "coordinator_dashboard.html", context)
 

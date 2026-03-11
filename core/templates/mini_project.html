@@ -101,6 +101,52 @@
         font-size: 18px;
     }
 
+    .sidebar-footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(13, 15, 21, 0.95);
+    }
+
+    .sidebar-footer .btn {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-profile {
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+    }
+
+    .btn-profile:hover {
+        background: rgba(59, 130, 246, 0.25);
+        color: #bfdbfe;
+        transform: translateY(-2px);
+    }
+
+    .btn-logout {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+    }
+
+    .btn-logout:hover {
+        background: rgba(239, 68, 68, 0.25);
+        color: #fecaca;
+        transform: translateY(-2px);
+    }
+
     .main-content {
         flex: 1;
         padding: 40px;
@@ -428,6 +474,18 @@
             <li><a href="#abstract" class="tab-link"><i class="bi bi-file-text"></i> Abstract</a></li>
             <li><a href="#evaluation" class="tab-link"><i class="bi bi-clipboard-check"></i> Evaluation</a></li>
         </ul>
+
+        <div class="sidebar-footer">
+            <a href="{% url 'profile' %}" class="btn btn-profile">
+                <i class="bi bi-person-circle"></i> Profile
+            </a>
+            <form method="post" action="{% url 'logout' %}" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-logout">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </form>
+        </div>
     </div>
 
     <!-- Main Content -->
