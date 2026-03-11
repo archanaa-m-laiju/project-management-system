@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load custom_filters %}
 
 {% block content %}
 <style>
@@ -463,6 +464,179 @@
                         
                         {% endwith %}
                     </div>
+
+                    <!-- First Evaluation (Student-level) -->
+                    {% with zeroth_eval=item.evaluations.zeroth %}
+                    <div class="mt-4 pt-3" style="border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                        <h6 style="color: #60a5fa; margin-bottom: 1rem;">📊 First Evaluation (Per Student)</h6>
+                        
+                        {% if not zeroth_eval or not zeroth_eval.is_completed %}
+                            <div class="alert alert-warning" style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); color: #fbbf24;">
+                                🔒 <strong>Locked:</strong> Complete Zeroth Evaluation first.
+                            </div>
+                        {% else %}
+                            {% with student_evals=item.student_evaluations.first %}
+                                <form method="post" action="{% url 'submit_coordinator_student_evaluation' item.group.id 'first' %}" style="background: rgba(96, 165, 250, 0.08); padding: 1rem; border-radius: 8px; border: 1px solid rgba(96, 165, 250, 0.2);">
+                                    {% csrf_token %}
+                                    {% if student_evals.values.0 and student_evals.values.0.coordinator_submitted %}
+                                    <div class="alert alert-success mb-3" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); color: #86efac;">
+                                        ✅ Evaluation submitted
+                                        {% if student_evals.values.0.finalized %}
+                                        <span class="ms-2"><strong>✓ Finalized</strong> (Both evaluations complete)</span>
+                                        {% else %}
+                                        <span class="ms-2">⏳ Waiting for guide evaluation...</span>
+                                        {% endif %}
+                                        <div class="mt-2"><small>You can edit the marks below if needed.</small></div>
+                                    </div>
+                                    {% endif %}
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered" style="background: rgba(17, 24, 39, 0.8); color: #e5e7eb;">
+                                            <thead>
+                                                <tr style="background: rgba(96, 165, 250, 0.1);">
+                                                    <th style="color: #93c5fd;">Student Name</th>
+                                                    <th style="color: #93c5fd; text-align: center;">Topic<br><small>(5)</small></th>
+                                                    <th style="color: #93c5fd; text-align: center;">Planning<br><small>(5)</small></th>
+                                                    <th style="color: #93c5fd; text-align: center;">Scale<br><small>(2)</small></th>
+                                                    <th style="color: #93c5fd; text-align: center;">Novelty<br><small>(5)</small></th>
+                                                    <th style="color: #93c5fd; text-align: center;">Task<br><small>(5)</small></th>
+                                                    <th style="color: #93c5fd; text-align: center;">Sched<br><small>(3)</small></th>
+                                                    <th style="color: #93c5fd; text-align: center;">Interim<br><small>(5)</small></th>
+                                                    <th style="color: #93c5fd; text-align: center;">Pres<br><small>(5)</small></th>
+                                                    <th style="color: #93c5fd; text-align: center;">Viva<br><small>(5)</small></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for member in item.members %}
+                                                {% with eval=student_evals|get_item:member.user.id %}
+                                                <tr>
+                                                    <td style="font-weight: 600; background: rgba(17, 24, 39, 0.8); color: #e5e7eb;">{{ member.user.username }}</td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_topic" min="0" max="5" value="{{ eval.coordinator_topic|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_planning" min="0" max="5" value="{{ eval.coordinator_planning|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_scalability" min="0" max="2" value="{{ eval.coordinator_scalability|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_novelty" min="0" max="5" value="{{ eval.coordinator_novelty|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_task_distribution" min="0" max="5" value="{{ eval.coordinator_task_distribution|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_schedule" min="0" max="3" value="{{ eval.coordinator_schedule|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_interim" min="0" max="5" value="{{ eval.coordinator_interim|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_presentation" min="0" max="5" value="{{ eval.coordinator_presentation|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_viva" min="0" max="5" value="{{ eval.coordinator_viva|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                </tr>
+                                                {% endwith %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- Presentation Review (Group-level) -->
+                                    {% with first_eval=item.evaluations.first %}
+                                    <div class="mt-3" style="border-top: 1px solid rgba(96, 165, 250, 0.2); padding-top: 1rem;">
+                                        <label for="presentation_review" style="color: #93c5fd; font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                                            📝 Presentation Review (Group)
+                                        </label>
+                                        <textarea 
+                                            name="presentation_review" 
+                                            id="presentation_review" 
+                                            rows="4" 
+                                            class="form-control" 
+                                            placeholder="Enter your review of the group's first presentation..."
+                                            style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb; resize: vertical;">{{ first_eval.coordinator_review|default:'' }}</textarea>
+                                    </div>
+                                    {% endwith %}
+                                    
+                                    <button type="submit" class="btn btn-info btn-sm mt-3">
+                                        {% if student_evals.values.0 and student_evals.values.0.coordinator_submitted %}Update{% else %}Submit{% endif %} First Evaluation
+                                    </button>
+                                </form>
+                            {% endwith %}
+                        {% endif %}
+                    </div>
+                    {% endwith %}
+
+                    <!-- Second Evaluation (Student-level) -->
+                    {% with first_evals=item.student_evaluations.first %}
+                    <div class="mt-4 pt-3" style="border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                        <h6 style="color: #34d399; margin-bottom: 1rem;">📊 Second Evaluation (Per Student)</h6>
+                        
+                        {% if not item.first_complete %}
+                            <div class="alert alert-warning" style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); color: #fbbf24;">
+                                🔒 <strong>Locked:</strong> Complete First Evaluation first.
+                            </div>
+                        {% else %}
+                            {% with student_evals=item.student_evaluations.second %}
+                                <form method="post" action="{% url 'submit_coordinator_student_evaluation' item.group.id 'second' %}" style="background: rgba(52, 211, 153, 0.08); padding: 1rem; border-radius: 8px; border: 1px solid rgba(52, 211, 153, 0.2);">
+                                    {% csrf_token %}
+                                    {% if student_evals.values.0 and student_evals.values.0.coordinator_submitted %}
+                                    <div class="alert alert-success mb-3" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); color: #86efac;">
+                                        ✅ Evaluation submitted
+                                        {% if student_evals.values.0.finalized %}
+                                        <span class="ms-2"><strong>✓ Finalized</strong> (Both evaluations complete)</span>
+                                        {% else %}
+                                        <span class="ms-2">⏳ Waiting for guide evaluation...</span>
+                                        {% endif %}
+                                        <div class="mt-2"><small>You can edit the marks below if needed.</small></div>
+                                    </div>
+                                    {% endif %}
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered" style="background: rgba(17, 24, 39, 0.8); color: #e5e7eb;">
+                                            <thead>
+                                                <tr style="background: rgba(52, 211, 153, 0.1);">
+                                                    <th style="color: #6ee7b7;">Student Name</th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Topic<br><small>(5)</small></th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Planning<br><small>(5)</small></th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Scale<br><small>(2)</small></th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Novelty<br><small>(5)</small></th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Task<br><small>(5)</small></th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Sched<br><small>(3)</small></th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Interim<br><small>(5)</small></th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Pres<br><small>(5)</small></th>
+                                                    <th style="color: #6ee7b7; text-align: center;">Viva<br><small>(5)</small></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for member in item.members %}
+                                                {% with eval=student_evals|get_item:member.user.id %}
+                                                <tr>
+                                                    <td style="font-weight: 600; background: rgba(17, 24, 39, 0.8); color: #e5e7eb;">{{ member.user.username }}</td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_topic" min="0" max="5" value="{{ eval.coordinator_topic|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_planning" min="0" max="5" value="{{ eval.coordinator_planning|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_scalability" min="0" max="2" value="{{ eval.coordinator_scalability|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_novelty" min="0" max="5" value="{{ eval.coordinator_novelty|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_task_distribution" min="0" max="5" value="{{ eval.coordinator_task_distribution|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_schedule" min="0" max="3" value="{{ eval.coordinator_schedule|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_interim" min="0" max="5" value="{{ eval.coordinator_interim|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_presentation" min="0" max="5" value="{{ eval.coordinator_presentation|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                    <td><input type="number" name="student_{{ member.user.id }}_viva" min="0" max="5" value="{{ eval.coordinator_viva|default:'' }}" class="form-control form-control-sm" required style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(96, 165, 250, 0.4); color: #e5e7eb;"></td>
+                                                </tr>
+                                                {% endwith %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- Presentation Review (Group-level) -->
+                                    {% with second_eval=item.evaluations.second %}
+                                    <div class="mt-3" style="border-top: 1px solid rgba(52, 211, 153, 0.2); padding-top: 1rem;">
+                                        <label for="presentation_review_second" style="color: #6ee7b7; font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                                            📝 Presentation Review (Group)
+                                        </label>
+                                        <textarea 
+                                            name="presentation_review" 
+                                            id="presentation_review_second" 
+                                            rows="4" 
+                                            class="form-control" 
+                                            placeholder="Enter your review of the group's second presentation..."
+                                            style="background: rgba(17, 24, 39, 0.95) !important; border: 1px solid rgba(52, 211, 153, 0.4); color: #e5e7eb; resize: vertical;">{{ second_eval.coordinator_review|default:'' }}</textarea>
+                                    </div>
+                                    {% endwith %}
+                                    
+                                    <button type="submit" class="btn btn-success btn-sm mt-3">
+                                        {% if student_evals.values.0 and student_evals.values.0.coordinator_submitted %}Update{% else %}Submit{% endif %} Second Evaluation
+                                    </button>
+                                </form>
+                            {% endwith %}
+                        {% endif %}
+                    </div>
+                    {% endwith %}
+
                 </div>
             </div>
         </div>

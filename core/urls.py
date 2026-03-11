@@ -31,4 +31,7 @@ urlpatterns = [
     path("evaluation/coordinator/<int:group_id>/<str:stage>/", views.submit_coordinator_evaluation, name="submit_coordinator_evaluation"),
     path("evaluation/upload/<str:stage>/", views.upload_evaluation_file, name="upload_evaluation_file"),
     path("evaluation/download/<int:file_id>/", views.download_evaluation_file, name="download_evaluation_file"),
+    # Student Evaluation URLs (First/Second)
+    path("evaluation/guide/student/<int:group_id>/<str:stage>/", views.submit_guide_student_evaluation, name="submit_guide_student_evaluation"),
+    path("evaluation/coordinator/student/<int:group_id>/<str:stage>/", views.submit_coordinator_student_evaluation, name="submit_coordinator_student_evaluation"),
 ]
