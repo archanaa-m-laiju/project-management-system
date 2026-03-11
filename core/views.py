@@ -221,6 +221,11 @@ def mini_project(request):
 		if to_user == request.user:
 			messages.error(request, "You cannot invite yourself.")
 			return redirect("mini_project")
+		
+		# Validate that recipient is a student
+		if not _is_student(to_user):
+			messages.error(request, "You can only send group requests to students.")
+			return redirect("mini_project")
 
 		if not group:
 			group = Group.objects.create(leader=request.user)
@@ -243,7 +248,8 @@ def mini_project(request):
 		return redirect("mini_project")
 
 	query = request.GET.get("q", "").strip()
-	available_students = User.objects.exclude(id=request.user.id)
+	# Only show students in the available list (exclude faculty, coordinators, HOD, admin)
+	available_students = User.objects.filter(student_profile__isnull=False).exclude(id=request.user.id)
 	if query:
 		available_students = available_students.filter(Q(username__icontains=query) | Q(email__icontains=query))
 
@@ -1380,11 +1386,32 @@ def submit_coordinator_evaluation(request, group_id, stage):
 
 	group = get_object_or_404(Group, id=group_id)
 	
-	# Verify the coordinator's department matches the group's department
-	coordinator_profile = request.user.faculty_profile
-	group_dept = getattr(getattr(group.leader, "student_profile", None), "department", None)
-	if coordinator_profile.department != group_dept:
-		messages.error(request, "You can only evaluate groups from your department.")
+	# Get student class and coordinator assignments
+	student_profile = getattr(group.leader, "student_profile", None)
+	if not student_profile or not student_profile.student_class:
+		messages.error(request, "Group leader's class is not assigned.")
+		return redirect("coordinator_dashboard")
+	
+	student_class = student_profile.student_class
+	coordinator_assignments = list(
+		CoordinatorAssignment.objects.filter(student_class=student_class)
+		.select_related('faculty')
+		.order_by('id')
+	)
+	
+	if not coordinator_assignments:
+		messages.error(request, "No coordinators assigned to this class.")
+		return redirect("coordinator_dashboard")
+	
+	# Determine which coordinator is submitting (coordinator1 or coordinator2)
+	coordinator_role = None
+	for idx, assignment in enumerate(coordinator_assignments, 1):
+		if assignment.faculty == request.user:
+			coordinator_role = idx
+			break
+	
+	if not coordinator_role:
+		messages.error(request, "You are not assigned as a coordinator for this class.")
 		return redirect("coordinator_dashboard")
 
 	if request.method == "POST":
@@ -1394,18 +1421,38 @@ def submit_coordinator_evaluation(request, group_id, stage):
 			stage=stage
 		)
 
-		# Check if already submitted
-		if evaluation.coordinator_submitted:
+		# Check if this coordinator already submitted
+		if coordinator_role == 1 and evaluation.coordinator1_submitted:
+			messages.warning(request, "You have already submitted this evaluation.")
+			return redirect("coordinator_dashboard")
+		elif coordinator_role == 2 and evaluation.coordinator2_submitted:
 			messages.warning(request, "You have already submitted this evaluation.")
 			return redirect("coordinator_dashboard")
 
-		# Update evaluation fields
+		# Update evaluation fields based on coordinator role
+		if coordinator_role == 1:
+			evaluation.coordinator1_technical_exposure = request.POST.get("technical_exposure") == "on"
+			evaluation.coordinator1_socially_relevant = request.POST.get("socially_relevant") == "on"
+			evaluation.coordinator1_product_based = request.POST.get("product_based") == "on"
+			evaluation.coordinator1_research_oriented = request.POST.get("research_oriented") == "on"
+			evaluation.coordinator1_review = request.POST.get("review", "").strip()
+			evaluation.coordinator1_submitted = True
+		else:  # coordinator_role == 2
+			evaluation.coordinator2_technical_exposure = request.POST.get("technical_exposure") == "on"
+			evaluation.coordinator2_socially_relevant = request.POST.get("socially_relevant") == "on"
+			evaluation.coordinator2_product_based = request.POST.get("product_based") == "on"
+			evaluation.coordinator2_research_oriented = request.POST.get("research_oriented") == "on"
+			evaluation.coordinator2_review = request.POST.get("review", "").strip()
+			evaluation.coordinator2_submitted = True
+		
+		# Also update legacy coordinator fields for backward compatibility
 		evaluation.coordinator_technical_exposure = request.POST.get("technical_exposure") == "on"
 		evaluation.coordinator_socially_relevant = request.POST.get("socially_relevant") == "on"
 		evaluation.coordinator_product_based = request.POST.get("product_based") == "on"
 		evaluation.coordinator_research_oriented = request.POST.get("research_oriented") == "on"
 		evaluation.coordinator_review = request.POST.get("review", "").strip()
 		evaluation.coordinator_submitted = True
+		
 		evaluation.save()
 
 		messages.success(request, f"{evaluation.get_stage_display()} submitted successfully!")
@@ -1590,18 +1637,39 @@ def submit_coordinator_student_evaluation(request, group_id, stage):
 
 	group = get_object_or_404(Group, id=group_id)
 	
-	# Verify the coordinator's department matches the group's department
-	coordinator_profile = request.user.faculty_profile
-	group_dept = getattr(getattr(group.leader, "student_profile", None), "department", None)
-	if coordinator_profile.department != group_dept:
-		messages.error(request, "You can only evaluate groups from your department.")
+	# Get student class and coordinator assignments
+	student_profile = getattr(group.leader, "student_profile", None)
+	if not student_profile or not student_profile.student_class:
+		messages.error(request, "Group leader's class is not assigned.")
+		return redirect("coordinator_dashboard")
+	
+	student_class = student_profile.student_class
+	coordinator_assignments = list(
+		CoordinatorAssignment.objects.filter(student_class=student_class)
+		.select_related('faculty')
+		.order_by('id')
+	)
+	
+	if not coordinator_assignments:
+		messages.error(request, "No coordinators assigned to this class.")
+		return redirect("coordinator_dashboard")
+	
+	# Determine which coordinator is submitting (coordinator1 or coordinator2)
+	coordinator_role = None
+	for idx, assignment in enumerate(coordinator_assignments, 1):
+		if assignment.faculty == request.user:
+			coordinator_role = idx
+			break
+	
+	if not coordinator_role:
+		messages.error(request, "You are not assigned as a coordinator for this class.")
 		return redirect("coordinator_dashboard")
 
 	if request.method == "POST":
 		# Get all group members
 		members = GroupMember.objects.filter(group=group).select_related("user")
 		
-		# Process marks for each student (coordinator can submit independently of guide)
+		# Process marks for each student
 		for member in members:
 			student = member.user
 			evaluation, created = StudentEvaluation.objects.get_or_create(
@@ -1610,8 +1678,34 @@ def submit_coordinator_student_evaluation(request, group_id, stage):
 				stage=stage
 			)
 
-			# Get marks from POST data (prefixed with student_id) - allow editing
+			# Get marks from POST data (prefixed with student_id)
 			prefix = f"student_{student.id}_"
+			
+			# Update fields based on coordinator role
+			if coordinator_role == 1:
+				evaluation.coordinator1_topic = int(request.POST.get(f"{prefix}topic", 0) or 0)
+				evaluation.coordinator1_planning = int(request.POST.get(f"{prefix}planning", 0) or 0)
+				evaluation.coordinator1_scalability = int(request.POST.get(f"{prefix}scalability", 0) or 0)
+				evaluation.coordinator1_novelty = int(request.POST.get(f"{prefix}novelty", 0) or 0)
+				evaluation.coordinator1_task_distribution = int(request.POST.get(f"{prefix}task_distribution", 0) or 0)
+				evaluation.coordinator1_schedule = int(request.POST.get(f"{prefix}schedule", 0) or 0)
+				evaluation.coordinator1_interim = int(request.POST.get(f"{prefix}interim", 0) or 0)
+				evaluation.coordinator1_presentation = int(request.POST.get(f"{prefix}presentation", 0) or 0)
+				evaluation.coordinator1_viva = int(request.POST.get(f"{prefix}viva", 0) or 0)
+				evaluation.coordinator1_submitted = True
+			else:  # coordinator_role == 2
+				evaluation.coordinator2_topic = int(request.POST.get(f"{prefix}topic", 0) or 0)
+				evaluation.coordinator2_planning = int(request.POST.get(f"{prefix}planning", 0) or 0)
+				evaluation.coordinator2_scalability = int(request.POST.get(f"{prefix}scalability", 0) or 0)
+				evaluation.coordinator2_novelty = int(request.POST.get(f"{prefix}novelty", 0) or 0)
+				evaluation.coordinator2_task_distribution = int(request.POST.get(f"{prefix}task_distribution", 0) or 0)
+				evaluation.coordinator2_schedule = int(request.POST.get(f"{prefix}schedule", 0) or 0)
+				evaluation.coordinator2_interim = int(request.POST.get(f"{prefix}interim", 0) or 0)
+				evaluation.coordinator2_presentation = int(request.POST.get(f"{prefix}presentation", 0) or 0)
+				evaluation.coordinator2_viva = int(request.POST.get(f"{prefix}viva", 0) or 0)
+				evaluation.coordinator2_submitted = True
+			
+			# Also update legacy coordinator fields for backward compatibility
 			evaluation.coordinator_topic = int(request.POST.get(f"{prefix}topic", 0) or 0)
 			evaluation.coordinator_planning = int(request.POST.get(f"{prefix}planning", 0) or 0)
 			evaluation.coordinator_scalability = int(request.POST.get(f"{prefix}scalability", 0) or 0)
@@ -1622,8 +1716,9 @@ def submit_coordinator_student_evaluation(request, group_id, stage):
 			evaluation.coordinator_presentation = int(request.POST.get(f"{prefix}presentation", 0) or 0)
 			evaluation.coordinator_viva = int(request.POST.get(f"{prefix}viva", 0) or 0)
 			evaluation.coordinator_submitted = True
-			# Finalize only if both guide and coordinator have submitted
-			if evaluation.guide_submitted and evaluation.coordinator_submitted:
+			
+			# Finalize only if guide and both coordinators have submitted
+			if evaluation.guide_submitted and evaluation.coordinator1_submitted and evaluation.coordinator2_submitted:
 				evaluation.finalized = True
 			evaluation.save()
 
@@ -1633,7 +1728,11 @@ def submit_coordinator_student_evaluation(request, group_id, stage):
 			group=group,
 			stage=stage
 		)
-		group_eval.coordinator_review = presentation_review
+		if coordinator_role == 1:
+			group_eval.coordinator1_review = presentation_review
+		else:
+			group_eval.coordinator2_review = presentation_review
+		group_eval.coordinator_review = presentation_review  # Legacy field
 		group_eval.save()
 
 		# Ensure all students have finalized status updated

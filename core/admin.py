@@ -1,20 +1,40 @@
 from django.contrib import admin
 
-from .models import Abstract, CoordinatorApproval, Group, GroupMember, GroupRequest, GuideRequest, Notification, StudentProfile, FacultyProfile, SustainableDevelopmentGoal, GroupEvaluation, EvaluationFile, StudentEvaluation
+from .models import Abstract, CoordinatorApproval, Group, GroupMember, GroupRequest, GuideRequest, Notification, StudentProfile, FacultyProfile, SustainableDevelopmentGoal, GroupEvaluation, EvaluationFile, StudentEvaluation, Class, CoordinatorAssignment
+
+
+@admin.register(Class)
+class ClassAdmin(admin.ModelAdmin):
+	list_display = ("name", "department")
+	search_fields = ("name", "department")
+	list_filter = ("department",)
+	ordering = ("department", "name")
+
+
+@admin.register(CoordinatorAssignment)
+class CoordinatorAssignmentAdmin(admin.ModelAdmin):
+	list_display = ("faculty", "student_class", "get_department")
+	search_fields = ("faculty__username", "faculty__email", "student_class__name")
+	list_filter = ("student_class__department",)
+	ordering = ("student_class__name", "faculty__username")
+	
+	def get_department(self, obj):
+		return obj.student_class.department
+	get_department.short_description = "Department"
 
 
 @admin.register(StudentProfile)
 class StudentProfileAdmin(admin.ModelAdmin):
-	list_display = ("user", "class_name", "roll_number", "register_number", "department", "cgp")
+	list_display = ("user", "student_class", "class_name", "roll_number", "register_number", "department", "cgp")
 	search_fields = ("user__username", "user__email", "user__first_name", "user__last_name", "roll_number", "register_number")
-	list_filter = ("department", "class_name")
+	list_filter = ("department", "class_name", "student_class")
 	ordering = ("user__username",)
 	fieldsets = (
 		("User Information", {
 			"fields": ("user",)
 		}),
 		("Academic Details", {
-			"fields": ("class_name", "roll_number", "register_number", "department", "cgp")
+			"fields": ("student_class", "class_name", "roll_number", "register_number", "department", "cgp")
 		}),
 	)
 

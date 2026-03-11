@@ -554,21 +554,36 @@
             <div class="info-card">
                 <h5><i class="bi bi-check-circle"></i> Coordinator Approval Status</h5>
                 {% if group and group_ready %}
-                    {% if coordinator_approval %}
-                        {% if coordinator_approval.status == 'pending' %}
+                    {% if coordinator_approvals %}
+                        {% if is_coordinator_approved %}
+                        <span class="status-badge success">✓ Approved</span>
+                        <p style="color: #9ca3af; margin-top: 10px;">Your group has been approved by a coordinator.</p>
+                        {% else %}
                         <span class="status-badge warning">⏳ Pending</span>
                         <p style="color: #9ca3af; margin-top: 10px;">Waiting for coordinator approval.</p>
-                        {% elif coordinator_approval.status == 'approved' %}
-                        <span class="status-badge success">✓ Approved</span>
-                        <p style="color: #9ca3af; margin-top: 10px;">Your group has been approved by the coordinator.</p>
-                        {% elif coordinator_approval.status == 'rejected' %}
-                        <span class="status-badge danger">✗ Rejected</span>
-                        <p style="color: #9ca3af; margin-top: 10px;">Your group was rejected. You can request approval again.</p>
-                        {% if is_leader %}
-                        <a class="btn btn-primary mt-3" href="{% url 'request_coordinator_approval' %}">
-                            <i class="bi bi-arrow-repeat"></i> Request Approval Again
-                        </a>
                         {% endif %}
+                        
+                        <div class="mt-3" style="color: #9ca3af;">
+                            <strong>Approval Requests:</strong>
+                            <ul class="mt-2" style="list-style: none; padding-left: 0;">
+                            {% for approval in coordinator_approvals %}
+                                <li class="mb-2">
+                                    <i class="bi bi-person"></i> {{ approval.coordinator.get_full_name|default:approval.coordinator.username }}
+                                    {% if approval.status == 'approved' %}
+                                        <span class="badge bg-success ms-2">Approved</span>
+                                    {% elif approval.status == 'rejected' %}
+                                        <span class="badge bg-danger ms-2">Rejected</span>
+                                    {% else %}
+                                        <span class="badge bg-warning ms-2">Pending</span>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                            </ul>
+                            <small><em>Any one coordinator approval is sufficient to proceed.</em></small>
+                        </div>
+                        
+                        {% if not is_coordinator_approved and is_leader %}
+                        <p class="mt-3" style="color: #9ca3af;"><small>If all coordinators rejected, you can request approval again.</small></p>
                         {% endif %}
                     {% else %}
                         {% if is_leader %}
