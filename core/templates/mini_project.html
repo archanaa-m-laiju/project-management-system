@@ -473,6 +473,7 @@
             <li><a href="#abstract" class="tab-link"><i class="bi bi-file-text"></i> Abstract</a></li>
             <li><a href="#sdg" class="tab-link"><i class="bi bi-globe"></i> SDG</a></li>
             <li><a href="#evaluation" class="tab-link"><i class="bi bi-clipboard-check"></i> Evaluation</a></li>
+            <li><a href="#project-report" class="tab-link"><i class="bi bi-file-earmark-pdf"></i> Project Report</a></li>
         </ul>
 
         <div class="sidebar-footer">
@@ -998,9 +999,131 @@
             {% endif %}
             {% endwith %}
 
+            <!-- CIE Marks Section -->
+            {% with second_eval=student_evaluations.second %}
+            <div class="info-card mt-4">
+                <h5 style="color: #f59e0b; margin-bottom: 1rem;"><i class="bi bi-calculator"></i> CIE Marks (75)</h5>
+                {% if second_eval and second_eval.cie_calculated %}
+                <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 1rem;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tbody>
+                            <tr>
+                                <td style="color: #e5e7eb; padding: 6px 0;">Committee Evaluation</td>
+                                <td style="color: #f59e0b; font-weight: 700; text-align: right; padding: 6px 0;">{{ second_eval.committee_mark }} / 40</td>
+                            </tr>
+                            <tr>
+                                <td style="color: #9ca3af; font-size: 12px; padding: 2px 0 8px 12px;">Raw: {{ second_eval.committee_raw_total }} / 240</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td style="color: #e5e7eb; padding: 6px 0;">Final Guide Evaluation</td>
+                                <td style="color: #f59e0b; font-weight: 700; text-align: right; padding: 6px 0;">{{ second_eval.final_guide_mark }} / 15</td>
+                            </tr>
+                            <tr>
+                                <td style="color: #e5e7eb; padding: 6px 0;">Project Report</td>
+                                <td style="color: #f59e0b; font-weight: 700; text-align: right; padding: 6px 0;">
+                                    {% if second_eval.group.project_report.final_mark != None %}{{ second_eval.group.project_report.final_mark }}{% else %}—{% endif %} / 10
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color: #e5e7eb; padding: 6px 0;">Attendance</td>
+                                <td style="color: #f59e0b; font-weight: 700; text-align: right; padding: 6px 0;">{{ second_eval.attendance_marks }} / 10</td>
+                            </tr>
+                            <tr style="border-top: 1px solid rgba(245, 158, 11, 0.3);">
+                                <td style="color: #fbbf24; font-weight: 700; padding: 10px 0 4px;">Total CIE</td>
+                                <td style="color: #fbbf24; font-weight: 700; font-size: 1.2rem; text-align: right; padding: 10px 0 4px;">{{ second_eval.cie_total }} / 75</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0" style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); color: #fbbf24;">
+                    CIE marks will be calculated after completion of all evaluation components.
+                </div>
+                {% endif %}
+            </div>
+            {% endwith %}
+
             {% else %}
             <div class="info-card">
                 <p style="color: #9ca3af;">You must be in a group to access evaluation features.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Project Report Tab -->
+        <div id="project-report" class="tab-content">
+            {% if group %}
+            <div class="info-card">
+                <h5><i class="bi bi-file-earmark-pdf"></i> Project Report</h5>
+                <p style="color: #9ca3af; margin-bottom: 0;">Group {{ group.id }} | Leader: {{ group.leader.username }}</p>
+            </div>
+
+            {% if not can_submit_report %}
+            <div class="info-card" style="border-color: rgba(251, 191, 36, 0.35);">
+                <div class="alert alert-warning mb-0" style="background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.35); color: #fbbf24;">
+                    Project report can only be submitted after completion of First and Second Evaluations.
+                </div>
+            </div>
+            {% endif %}
+
+            {% if project_report %}
+            <div class="info-card">
+                <h5 style="color: #86efac;"><i class="bi bi-check-circle"></i> Uploaded Report</h5>
+                <p style="margin-bottom: 10px; color: #e5e7eb;"><strong>File:</strong> {{ project_report.report_file.name|cut:'project_reports/' }}</p>
+                <p style="margin-bottom: 10px; color: #e5e7eb;">
+                    <strong>Status:</strong>
+                    {% if project_report.review_status == 'rejected' %}
+                    <span class="status-badge danger">Rejected</span>
+                    {% elif project_report.review_status == 'approved' %}
+                    <span class="status-badge success">Approved</span>
+                    {% else %}
+                    <span class="status-badge warning">Pending</span>
+                    {% endif %}
+                </p>
+                <a class="btn btn-primary" href="{% url 'download_project_report' project_report.id %}">
+                    <i class="bi bi-download"></i> Download Report
+                </a>
+
+                {% if project_report.review_status == 'rejected' %}
+                <div class="alert alert-danger mt-3" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fecaca;">
+                    <strong>Rejected Review:</strong><br>
+                    {{ project_report.rejection_review|linebreaksbr }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if is_leader and can_submit_report %}
+            <div class="info-card">
+                <h5><i class="bi bi-upload"></i>
+                    {% if project_report and project_report.review_status == 'rejected' %}
+                    Submit New Project Report (PDF)
+                    {% elif project_report %}
+                    Replace Project Report (PDF)
+                    {% else %}
+                    Upload Project Report (PDF)
+                    {% endif %}
+                </h5>
+                <form method="post" action="{% url 'submit_project_report' group.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="form-group-custom">
+                        <label for="report_file">Select PDF</label>
+                        <input type="file" class="form-control" id="report_file" name="report_file" accept="application/pdf,.pdf" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-cloud-upload"></i> {% if project_report %}Update Report{% else %}Upload Report{% endif %}
+                    </button>
+                </form>
+            </div>
+            {% elif not is_leader %}
+            <div class="info-card">
+                <p style="color: #9ca3af; margin: 0;">Only the group leader can upload the project report.</p>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="info-card">
+                <p style="color: #9ca3af; margin: 0;">You must be in a group to access project report submission.</p>
             </div>
             {% endif %}
         </div>
@@ -1008,23 +1131,36 @@
 </div>
 
 <script>
+    function activateTab(tabId) {
+        const target = document.getElementById(tabId);
+        if (!target) {
+            return;
+        }
+
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-link').forEach(link => {
+            link.classList.remove('active');
+        });
+
+        target.classList.add('active');
+        const activeLink = document.querySelector('.tab-link[href="#' + tabId + '"]');
+        if (activeLink) {
+            activeLink.classList.add('active');
+        }
+    }
+
     document.querySelectorAll('.tab-link').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
-            
-            // Remove active class from all tabs and links
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.querySelectorAll('.tab-link').forEach(l => {
-                l.classList.remove('active');
-            });
-            
-            // Add active class to clicked link and corresponding tab
             const tabId = this.getAttribute('href').substring(1);
-            document.getElementById(tabId).classList.add('active');
-            this.classList.add('active');
+            activateTab(tabId);
+            window.location.hash = tabId;
         });
     });
+
+    const initialTab = window.location.hash ? window.location.hash.substring(1) : 'group';
+    activateTab(initialTab);
 </script>
 {% endblock %}

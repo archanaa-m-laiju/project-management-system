@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Abstract, CoordinatorApproval, Group, GroupMember, GroupRequest, GuideRequest, Notification, StudentProfile, FacultyProfile, SustainableDevelopmentGoal, GroupEvaluation, EvaluationFile, StudentEvaluation, Class, CoordinatorAssignment
+from .models import Abstract, CoordinatorApproval, Group, GroupMember, GroupRequest, GuideRequest, Notification, StudentProfile, FacultyProfile, SustainableDevelopmentGoal, GroupEvaluation, EvaluationFile, StudentEvaluation, Class, CoordinatorAssignment, ProjectReport
 
 
 @admin.register(Class)
@@ -160,6 +160,26 @@ class EvaluationFileAdmin(admin.ModelAdmin):
 	list_filter = ("stage", "uploaded_at")
 	ordering = ("-uploaded_at",)
 	readonly_fields = ("uploaded_at",)
+
+
+@admin.register(ProjectReport)
+class ProjectReportAdmin(admin.ModelAdmin):
+	list_display = (
+		"group",
+		"uploaded_by",
+		"uploaded_at",
+		"coordinator1_mark",
+		"coordinator2_mark",
+		"final_mark",
+		"review_status",
+	)
+	search_fields = (
+		"group__leader__username",
+		"uploaded_by__username",
+	)
+	list_filter = ("review_status", "uploaded_at")
+	ordering = ("-uploaded_at",)
+	readonly_fields = ("uploaded_at", "rejected_at")
 
 
 @admin.register(StudentEvaluation)

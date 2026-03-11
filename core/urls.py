@@ -11,6 +11,11 @@ urlpatterns = [
     path("switch-role/", views.switch_role, name="switch_role"),
     path("profile/", views.profile, name="profile"),
     path("mini-project/", views.mini_project, name="mini_project"),
+    path("project-report/", views.project_report, name="project_report"),
+    path("project-report/submit/<int:group_id>/", views.submit_project_report, name="submit_project_report"),
+    path("project-report/mark/<int:report_id>/", views.submit_report_mark, name="submit_report_mark"),
+    path("project-report/reject/<int:report_id>/", views.submit_report_rejection, name="submit_report_rejection"),
+    path("project-report/download/<int:report_id>/", views.download_project_report, name="download_project_report"),
     path("sdg-submission/", views.sdg_submission, name="sdg_submission"),
     path("group-requests/", views.group_requests, name="group_requests"),
     path("guide-request/", views.guide_request, name="guide_request"),
@@ -34,5 +39,7 @@ urlpatterns = [
     path("evaluation/download/<int:file_id>/", views.download_evaluation_file, name="download_evaluation_file"),
     # Student Evaluation URLs (First/Second)
     path("evaluation/guide/student/<int:group_id>/<str:stage>/", views.submit_guide_student_evaluation, name="submit_guide_student_evaluation"),
+    path("evaluation/guide/final/<int:group_id>/", views.submit_final_guide_evaluation, name="submit_final_guide_evaluation"),
     path("evaluation/coordinator/student/<int:group_id>/<str:stage>/", views.submit_coordinator_student_evaluation, name="submit_coordinator_student_evaluation"),
+    path("evaluation/attendance/<int:group_id>/", views.submit_attendance_marks, name="submit_attendance_marks"),
 ]

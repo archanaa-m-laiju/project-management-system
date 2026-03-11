@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -346,6 +347,55 @@ class EvaluationFile(models.Model):
 		return self.file_name.split('.')[-1].lower() if '.' in self.file_name else ''
 
 
+class ProjectReport(models.Model):
+	"""Group-level project report and coordinator review marks."""
+	STATUS_PENDING = "pending"
+	STATUS_APPROVED = "approved"
+	STATUS_REJECTED = "rejected"
+	STATUS_CHOICES = [
+		(STATUS_PENDING, "Pending"),
+		(STATUS_APPROVED, "Approved"),
+		(STATUS_REJECTED, "Rejected"),
+	]
+
+	group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="project_report")
+	report_file = models.FileField(upload_to="project_reports/")
+	uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
+	uploaded_at = models.DateTimeField(auto_now_add=True)
+	review_status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_PENDING)
+	rejection_review = models.TextField(blank=True)
+	rejected_by = models.ForeignKey(
+		User,
+		null=True,
+		blank=True,
+		on_delete=models.SET_NULL,
+		related_name="rejected_project_reports",
+	)
+	rejected_at = models.DateTimeField(null=True, blank=True)
+
+	coordinator1_mark = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(10)],
+	)
+	coordinator2_mark = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(10)],
+	)
+	final_mark = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(10)],
+	)
+
+	coordinator1_submitted = models.BooleanField(default=False)
+	coordinator2_submitted = models.BooleanField(default=False)
+
+	def __str__(self):
+		return f"Project Report - Group {self.group_id}"
+
+
 class StudentEvaluation(models.Model):
 	"""Per-student evaluation for First and Second stages with detailed criteria."""
 	STAGE_CHOICES = [
@@ -408,6 +458,88 @@ class StudentEvaluation(models.Model):
 	coordinator_viva = models.IntegerField(null=True, blank=True)
 
 	coordinator_submitted = models.BooleanField(default=False)
+
+	attendance_marks = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(10)],
+	)
+	attendance_submitted = models.BooleanField(default=False)
+	attendance_submitted_by = models.ForeignKey(
+		User,
+		null=True,
+		blank=True,
+		on_delete=models.SET_NULL,
+		related_name="attendance_uploaded",
+	)
+	attendance_submitted_at = models.DateTimeField(null=True, blank=True)
+
+	final_guide_topic = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_planning = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_scale = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(2)],
+	)
+	final_guide_novelty = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_task = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_schedule = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(3)],
+	)
+	final_guide_interim = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_presentation = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_viva = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(5)],
+	)
+	final_guide_total = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(40)],
+	)
+
+	final_guide_raw = models.IntegerField(
+		null=True,
+		blank=True,
+		validators=[MinValueValidator(0), MaxValueValidator(40)],
+	)
+	final_guide_mark = models.IntegerField(null=True, blank=True)
+	final_guide_submitted = models.BooleanField(default=False)
+	final_guide_submitted_at = models.DateTimeField(null=True, blank=True)
+
+	# CIE (Continuous Internal Evaluation) fields — stored on the "second" stage record
+	committee_raw_total = models.IntegerField(null=True, blank=True)
+	committee_mark = models.IntegerField(null=True, blank=True)
+	cie_total = models.IntegerField(null=True, blank=True)
+	cie_calculated = models.BooleanField(default=False)
+	cie_calculated_at = models.DateTimeField(null=True, blank=True)
 
 	finalized = models.BooleanField(default=False)
 
@@ -486,8 +618,13 @@ class StudentEvaluation(models.Model):
 		return sum(marks)
 
 	@property
+	def second_eval_completed(self):
+		"""Returns True when guide and both coordinators have submitted second evaluation marks."""
+		return self.guide_submitted and self.coordinator1_submitted and self.coordinator2_submitted
+
+	@property
 	def is_completed(self):
 		"""Returns True if guide and both coordinators have submitted and finalized."""
-		return self.guide_submitted and self.coordinator1_submitted and self.coordinator2_submitted and self.finalized
+		return self.second_eval_completed and self.finalized
 
 
